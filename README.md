@@ -18,21 +18,21 @@
                     +---------------- Ryu Controller -----+
                                     (path_selection.py)
 ```
-
+`\`
 ## **執行方式&功能**
 
 ### 1. 啟動Ryu
 ```bash
 ryu-manager --observe-links --wsapi-port 8080 path_selection.py --ofp-tcp-listen-port 6633
 ```
-
+`\`
 ### 2. 啟動Mininet
 ```bash
 sudo mn --custom topo.py --topo user_mesh \
     --controller=remote,ip=127.0.0.1,port=6633 \
     --switch ovsk,protocols=OpenFlow13 --mac --link=tc
 ```
-
+`\`
 ### 3. API 功能
 
 **查詢拓樸**
@@ -40,19 +40,19 @@ sudo mn --custom topo.py --topo user_mesh \
 ```bash
 curl http://127.0.0.1:8080/topo | jq .
 ```
-
+`\`
 **查詢目前學到的主機位置**
 方法(GET) : /hosts
 ```bash
 curl http://127.0.0.1:8080/hosts | jq .
 ```
-
+`\`
 **查詢路徑**
 方法(GET) : /paths?來源地&目的地
 ```bash
 curl "http://127.0.0.1:8080/paths?src_mac=02:00:00:00:00:01&dst_mac=02:00:00:00:00:02" | jq .
 ```
-
+`\`
 **安裝指定路徑**
 方法(POST) : /paths -H 'Content-Type: application/json' -d '{來源地,目的地,路徑id}'
 (-H 'Content-Type: application/json'，我有指定用json所以必加。bidirectional會預設是true不用特別寫)
@@ -61,7 +61,7 @@ curl -X POST http://127.0.0.1:8080/path \
     -H 'Content-Type: application/json' \
     -d '{"src_mac":"02:00:00:00:00:01","dst_mac":"02:00:00:00:00:02","path_id":1,"bidirectional":true}'
 ```
-
+`\`
 **刪除指定路徑**
 方法(DELETE) : /paths?來源地&目的地
 ```bash
