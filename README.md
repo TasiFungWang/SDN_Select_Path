@@ -20,6 +20,10 @@
 ```
 <br>
 
+## **自訂拓樸示意圖**
+![ 拓樸](./path_selection/topo_sample.JPG)
+<br>
+
 ## **執行方式&功能**
 
 ### 1. 啟動Ryu
