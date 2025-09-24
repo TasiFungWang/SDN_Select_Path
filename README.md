@@ -21,7 +21,7 @@
 
 ## **執行方式&功能**
 
-### **Enroll Member 註冊會員**
+### 1. 啟動
 
 ```bash
 gcc packet_server.c -o server.exe -lws2_32
