@@ -21,7 +21,7 @@
 <br>
 
 ## **自訂拓樸示意圖**
-![ 拓樸](./path_selection/topo_sample.JPG)
+![ 拓樸](./path_selection/topo_sample.jpg)
 <br>
 
 ## **執行方式&功能**
