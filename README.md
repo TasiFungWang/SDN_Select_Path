@@ -83,7 +83,7 @@ curl -X DELETE "http://127.0.0.1:8080/paths?src_mac=02:00:00:00:00:01&dst_mac=02
 ### **執行範例影片**
 [C_Custom_Packet viedo](https://youtu.be/dJa6oouFyHk)
 
-### **參考資料(未全部記住)**
+### **參考資料**
 1. https://tingkuan.wordpress.com/2018/04/12/%E3%80%90ryu-controller-%E9%81%8B%E4%BD%9C%E5%8E%9F%E7%90%86%E3%80%91/
 2. https://ithelp.ithome.com.tw/m/articles/1025248
 3. https://blog.csdn.net/qq_44577070/article/details/121923645
