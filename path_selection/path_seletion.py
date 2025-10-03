@@ -6,17 +6,17 @@
 # 功能總覽：
 #   1) 自動掃描拓樸（switches、links），建立方向圖（DiGraph），並記錄每條「方向連結」的輸出埠 out_port
 #      - 使用 ryu.topology（需 --observe-links），每次查詢 /topo、/paths 前會同步拓樸
-#      - 維護 isw_ports：所有交換器的「互連埠」(dpid, port_no)
-#      - 若 mac_table 裡有主機被「誤學在互連埠」，會在拓樸重建時清掉
+#      - 維護 isw_ports：所有交換器的「連接埠」(dpid, port_no)
+#      - 若 mac_table 裡有主機被「誤學在連接埠」，會在拓樸重建時清掉
 #
-#   2) L2 學習主機：只在「非互連埠」學習 MAC -> (dpid, port)
+#   2) L2 學習主機：只在「非連接埠」學習 MAC -> (dpid, port)
 #      - 避免把主機 MAC 誤學在 uplink
 #      - 開啟 debug_learn 時會在 Ryu log 印出學習/忽略紀錄（方便除錯）
 #
-#   3) ARP 處理：優先 ARP Proxy，不泛洪；若資訊不足，才「有限度」對互連埠泛洪
+#   3) ARP 處理：優先 ARP Proxy，不泛洪；若資訊不足，才「有限度」對連接埠泛洪
 #      - 維護 ip_table（IP -> MAC）
 #      - 看到 ARP Request 且已知目標 IP 的 MAC：由控制器直接送 ARP Reply 回入埠（不泛洪）
-#      - 否則僅對「互連埠」做有限度泛洪（不丟到邊緣主機埠），避免風暴，並協助跨交換器學習
+#      - 否則僅對「連接埠」做有限度泛洪（不丟到邊緣主機埠），避免風暴，並協助跨交換器學習
 #      - 目標：在你 DELETE 路徑之後，也能可靠地重新學回主機位置、恢復列徑與選路
 #
 #   4) 路徑列舉（以交換器序列表示）：
@@ -84,7 +84,7 @@
 #
 # 設計取捨與限制：
 #   - _all_normal_ports() 以 1..32 示意；正式環境應查詢實際可用埠
-#   - ARP Proxy 基於簡單 ip_table（實驗足夠）；首次未知時會對「互連埠」有限度泛洪
+#   - ARP Proxy 基於簡單 ip_table（實驗足夠）；首次未知時會對「連接埠」有限度泛洪
 #   - 僅 L2 精準 match（eth_type + src/dst MAC），不做 L3/L4 精細分類
 #   - 若主機 MAC / IP 變更，需重新學習（送流量或清 ARP 後 ping）
 #   - 此段註解由ChatGPT提供
@@ -153,7 +153,7 @@ class UserPathController(app_manager.RyuApp):
     初始化應用程式：
       - 註冊 REST Controller。
       - 建立狀態表（datapaths、mac_table、拓樸圖與連結埠對照、路徑快取）。
-      - isw_ports: 所有交換器互連埠集合 (dpid, port_no)。
+      - isw_ports: 所有交換器連接埠集合 (dpid, port_no)。
       - ip_table: 簡易 IP -> MAC 對照，供 ARP Proxy 使用。
       - debug_learn: 是否輸出學習/忽略等偵錯訊息到 Ryu log。
     """
@@ -171,7 +171,7 @@ class UserPathController(app_manager.RyuApp):
         # 快取 (src_sw, dst_sw) 對應的候選路徑列表（拓樸改變時清空）
         self.path_cache = {}
 
-        self.isw_ports = set()      # 所有交換器互連埠 (dpid, port_no)
+        self.isw_ports = set()      # 所有交換器連接埠 (dpid, port_no)
         self.ip_table = {}          # ARP Proxy 用：IP -> MAC
         self.debug_learn = True     # 是否在學習/忽略時印出詳細 log
 
@@ -204,9 +204,9 @@ class UserPathController(app_manager.RyuApp):
     從 Ryu topology API 讀取目前 switches/links，重建：
       - self.graph：方向圖（節點為 dpid，邊為 src->dst）。
       - self.link_port：每條方向邊 (src, dst) 的輸出埠 out_port。
-      - self.isw_ports：互連埠集合（用於避免在 uplink 口學到主機）。
+      - self.isw_ports：連接埠集合（用於避免在 uplink 口學到主機）。
     另外：
-      - 如果 mac_table 內主機位置落在互連埠，視為誤學並移除。
+      - 如果 mac_table 內主機位置落在連接埠，視為誤學並移除。
       - 清除 path_cache，以避免使用過期路徑。
     """
     def _rebuild_topology(self):
@@ -221,7 +221,7 @@ class UserPathController(app_manager.RyuApp):
         for sw in switches:
             self.graph.add_node(sw.dp.id)
 
-        # 加入方向邊，並記錄 out_port 與互連埠
+        # 加入方向邊，並記錄 out_port 與連接埠
         for l in links:
             src = l.src.dpid
             dst = l.dst.dpid
@@ -229,7 +229,7 @@ class UserPathController(app_manager.RyuApp):
             self.link_port[(src, dst)] = l.src.port_no
             self.isw_ports.add((src, l.src.port_no))
 
-        # 移除主機紀錄以學的互連埠（避免誤學）
+        # 移除主機紀錄以學的連接埠（避免誤學）
         bad = [mac for mac, (dpid, port) in self.mac_table.items()
                if (dpid, port) in self.isw_ports]
         for mac in bad:
@@ -268,10 +268,10 @@ class UserPathController(app_manager.RyuApp):
     # === PacketIn for L2 learning & ARP handling ===
     """
     接收 PacketIn：
-      - L2 學習：只在非互連埠學習 MAC 所在的 (dpid, port)。
+      - L2 學習：只在非連接埠學習 MAC 所在的 (dpid, port)。
       - ARP：
           * 如果是 ARP Request 並且已知目標 IP 的 MAC，直接由控制器送 ARP Reply（Proxy，不泛洪）。
-          * 否則僅對「互連埠」做有限度 flood（不丟到邊緣主機埠與入埠），協助跨交換器學習。
+          * 否則僅對「連接埠」做有限度 flood（不丟到邊緣主機埠與入埠），協助跨交換器學習。
       - 其他封包：若已有規則一般不會進到控制器，所以就不轉送。
     """
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
@@ -295,7 +295,7 @@ class UserPathController(app_manager.RyuApp):
         src = mac_str(eth.src)
         dst = mac_str(eth.dst)
 
-        # 只在「非互連埠」學習主機位置
+        # 只在「非連接埠」學習主機位置
         if (dpid, in_port) not in self.isw_ports:
             prev = self.mac_table.get(src)
             self.mac_table[src] = (dpid, in_port)
@@ -325,7 +325,7 @@ class UserPathController(app_manager.RyuApp):
                                          dpid, src, arp_pkt.dst_ip, t_mac)
                     return
 
-            # 否則對「互連埠」做有限泛洪（避免影響主機邊緣埠與入埠）
+            # 否則對「連接埠」做有限泛洪（避免影響主機邊緣埠與入埠）
             actions = []
             for p in self._uplink_ports_of(dpid):
                 if p != in_port:
@@ -374,7 +374,7 @@ class UserPathController(app_manager.RyuApp):
         dp.send_msg(out)
 
     """
-    取得某交換器的邊緣主機埠（排除互連埠）。
+    取得某交換器的邊緣主機埠（排除連接埠）。
     程式中沒用到。
     如果要找出所有邊緣主機 port 就可以用 OpenFlow port-desc / features 搭配 _edge_ports_of 用
     """
@@ -384,7 +384,7 @@ class UserPathController(app_manager.RyuApp):
 
 
     """
-    取得某交換器的互連埠列表（uplink/inter-switch）。
+    取得某交換器的連接埠列表（uplink/inter-switch）。
     用於 ARP 有限度泛洪，避免打到主機邊緣口。
     """
     def _uplink_ports_of(self, dpid):
@@ -764,3 +764,4 @@ class UserPathRest(ControllerBase):
             })
         except Exception as e:
             return bad_json(e, status=400)
+
