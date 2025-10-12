@@ -87,7 +87,6 @@
 #   - ARP Proxy 基於簡單 ip_table（實驗足夠）；首次未知時會對「連接埠」有限度泛洪
 #   - 僅 L2 精準 match（eth_type + src/dst MAC），不做 L3/L4 精細分類
 #   - 若主機 MAC / IP 變更，需重新學習（送流量或清 ARP 後 ping）
-#   - 此段註解由ChatGPT提供
 # -----------------------------------------------------------------------------
 
 from ryu.base import app_manager                    # Ryu 應用程式基底類別（RyuApp）
@@ -764,4 +763,5 @@ class UserPathRest(ControllerBase):
             })
         except Exception as e:
             return bad_json(e, status=400)
+
 
